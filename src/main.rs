@@ -4,7 +4,7 @@ use crate::sphere::Sphere;
 
 use nalgebra as na;
 use std::fs::File;
-use std::io::Write;
+use std::io::{BufWriter, Write};
 
 fn main() -> Result<(), Box<std::error::Error>> {
     let s = Sphere::new(na::Vector3::new(-3., 0., -16.), 2.);
@@ -29,14 +29,15 @@ fn render(sphere: &Sphere) -> std::io::Result<()> {
         }
     }
 
-    let mut file = File::create("out.ppm")?;
-    write!(file, "P6\n{} {}\n255\n", width, height)?;
-
-    for v in framebuffer {
-        for i in 0..3 {
-            file.write(&[(v[i] * 255.) as u8])?;
-        }
-    }
+    let file = File::create("out.ppm")?;
+    let mut buf = BufWriter::with_capacity(10_000_000, file);
+    write!(buf, "P6\n{} {}\n255\n", width, height)?;
+    buf.write_all(
+        &framebuffer
+            .iter()
+            .flat_map(|v| v.iter().map(|x| (x * 255.) as u8))
+            .collect::<Vec<_>>(),
+    )?;
 
     Ok(())
 }
