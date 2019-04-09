@@ -50,5 +50,5 @@ fn cast_ray(
     sphere
         .ray_intersect(origin, direction)
         .map(|_| na::Vector3::new(0.4, 0.4, 0.3))
-        .unwrap_or(na::Vector3::new(0.2, 0.7, 0.8))
+        .unwrap_or_else(|| na::Vector3::new(0.2, 0.7, 0.8))
 }
