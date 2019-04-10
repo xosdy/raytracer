@@ -1,24 +1,38 @@
+mod material;
 mod sphere;
 
-use crate::sphere::Sphere;
-
-use nalgebra as na;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 
+use nalgebra as na;
+
+use crate::material::Material;
+use crate::sphere::Sphere;
+
 fn main() -> Result<(), Box<std::error::Error>> {
+    let ivory = Material::new(na::Vector3::new(0.4, 0.4, 0.3));
+    let red_rubber = Material::new(na::Vector3::new(0.3, 0.1, 0.1));
+
     let mut spheres = vec![];
-    spheres.push(Sphere::new(na::Vector3::new(-3., 0., -16.), 2.));
-    spheres.push(Sphere::new(na::Vector3::new(-1., -1.5, -12.), 2.));
-    spheres.push(Sphere::new(na::Vector3::new(1.5, -0.5, -18.), 3.));
-    spheres.push(Sphere::new(na::Vector3::new(7., 5., -18.), 4.));
+    spheres.push(Sphere::new(na::Vector3::new(-3., 0., -16.), 2., ivory));
+    spheres.push(Sphere::new(
+        na::Vector3::new(-1., -1.5, -12.),
+        2.,
+        red_rubber,
+    ));
+    spheres.push(Sphere::new(
+        na::Vector3::new(1.5, -0.5, -18.),
+        3.,
+        red_rubber,
+    ));
+    spheres.push(Sphere::new(na::Vector3::new(7., 5., -18.), 4., ivory));
 
     render(&spheres)?;
 
     Ok(())
 }
 
-fn render(spheres: &Vec<Sphere>) -> std::io::Result<()> {
+fn render(spheres: &[Sphere]) -> std::io::Result<()> {
     let width = 1024;
     let height = 768;
     let fov = std::f32::consts::PI / 2.;
@@ -50,10 +64,10 @@ fn render(spheres: &Vec<Sphere>) -> std::io::Result<()> {
 fn cast_ray(
     origin: &na::Vector3<f32>,
     direction: &na::Vector3<f32>,
-    spheres: &Vec<Sphere>,
+    spheres: &[Sphere],
 ) -> na::Vector3<f32> {
-    if scene_intersect(origin, direction, spheres) {
-        na::Vector3::new(0.4, 0.4, 0.3)
+    if let Some(material) = scene_intersect(origin, direction, spheres) {
+        material.diffuse_color
     } else {
         na::Vector3::new(0.2, 0.7, 0.8)
     }
@@ -62,11 +76,14 @@ fn cast_ray(
 fn scene_intersect(
     origin: &na::Vector3<f32>,
     direction: &na::Vector3<f32>,
-    spheres: &Vec<Sphere>,
-) -> bool {
+    spheres: &[Sphere],
+) -> Option<Material> {
     spheres
         .iter()
-        .filter_map(|s| s.ray_intersect(origin, direction))
-        .min_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal))
-        .is_some()
+        .filter_map(|s| {
+            s.ray_intersect(origin, direction)
+                .map(|dist| (dist, s.material))
+        })
+        .min_by(|(x, _), (y, _)| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(_, mat)| mat)
 }

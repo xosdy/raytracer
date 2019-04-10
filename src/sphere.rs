@@ -1,13 +1,20 @@
 use nalgebra as na;
 
+use crate::material::Material;
+
 pub struct Sphere {
-    center: na::Vector3<f32>,
-    radius: f32,
+    pub center: na::Vector3<f32>,
+    pub radius: f32,
+    pub material: Material,
 }
 
 impl Sphere {
-    pub fn new(center: na::Vector3<f32>, radius: f32) -> Sphere {
-        Sphere { center, radius }
+    pub fn new(center: na::Vector3<f32>, radius: f32, material: Material) -> Sphere {
+        Sphere {
+            center,
+            radius,
+            material,
+        }
     }
 
     pub fn ray_intersect(
