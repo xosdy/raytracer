@@ -18,24 +18,29 @@ struct RaycastHit {
 }
 
 fn main() -> Result<(), Box<std::error::Error>> {
-    let ivory = Material::new(na::Vector3::new(0.4, 0.4, 0.3));
-    let red_rubber = Material::new(na::Vector3::new(0.3, 0.1, 0.1));
+    let ivory = Material::new(
+        na::Vector2::new(0.6, 0.3),
+        na::Vector3::new(0.4, 0.4, 0.3),
+        50.,
+    );
+    let red_rubber = Material::new(
+        na::Vector2::new(0.9, 0.1),
+        na::Vector3::new(0.3, 0.1, 0.1),
+        10.,
+    );
 
-    let mut spheres = vec![];
-    spheres.push(Sphere::new(na::Vector3::new(-3., 0., -16.), 2., ivory));
-    spheres.push(Sphere::new(
-        na::Vector3::new(-1., -1.5, -12.),
-        2.,
-        red_rubber,
-    ));
-    spheres.push(Sphere::new(
-        na::Vector3::new(1.5, -0.5, -18.),
-        3.,
-        red_rubber,
-    ));
-    spheres.push(Sphere::new(na::Vector3::new(7., 5., -18.), 4., ivory));
+    let spheres = vec![
+        Sphere::new(na::Vector3::new(-3., 0., -16.), 2., ivory),
+        Sphere::new(na::Vector3::new(-1., -1.5, -12.), 2., red_rubber),
+        Sphere::new(na::Vector3::new(1.5, -0.5, -18.), 3., red_rubber),
+        Sphere::new(na::Vector3::new(7., 5., -18.), 4., ivory),
+    ];
 
-    let light = vec![Light::new(na::Vector3::new(-20., 20., 20.), 1.5)];
+    let light = vec![
+        Light::new(na::Vector3::new(-20., 20., 20.), 1.5),
+        Light::new(na::Vector3::new(30., 50., -25.), 1.8),
+        Light::new(na::Vector3::new(30., 20., 30.), 1.7),
+    ];
 
     render(&spheres, &light)?;
 
@@ -63,8 +68,17 @@ fn render(spheres: &[Sphere], lights: &[Light]) -> std::io::Result<()> {
     write!(buf, "P6\n{} {}\n255\n", width, height)?;
     buf.write_all(
         &framebuffer
-            .iter()
-            .flat_map(|v| v.iter().map(|x| (na::clamp(x, &0., &1.) * 255.) as u8))
+            .iter_mut()
+            .flat_map(|v| {
+                let max = *v
+                    .iter()
+                    .max_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal))
+                    .unwrap();
+                if max > 1. {
+                    *v *= 1. / max;
+                }
+                v.iter().map(|x| (na::clamp(x, &0., &1.) * 255.) as u8)
+            })
             .collect::<Vec<_>>(),
     )?;
 
@@ -79,12 +93,19 @@ fn cast_ray(
 ) -> na::Vector3<f32> {
     if let Some(hit) = scene_intersect(origin, direction, spheres) {
         let mut diffuse_light_intensity = 0.;
+        let mut specular_light_intensity = 0.;
         for light in lights {
             let light_dir = (light.position - hit.position).normalize();
             diffuse_light_intensity += light.intensity * (light_dir.dot(&hit.normal)).max(0.);
+            specular_light_intensity += reflect(&-light_dir, &hit.normal)
+                .dot(direction)
+                .max(0.)
+                .powf(hit.material.specular_exponent)
+                * light.intensity;
         }
 
-        hit.material.diffuse_color * diffuse_light_intensity
+        hit.material.diffuse_color * diffuse_light_intensity * hit.material.albedo[0]
+            + na::Vector3::new(1., 1., 1.) * specular_light_intensity * hit.material.albedo[1]
     } else {
         na::Vector3::new(0.2, 0.7, 0.8)
     }
@@ -107,4 +128,11 @@ fn scene_intersect(
                 normal: (hit_point - s.center).normalize(),
             }
         })
+}
+
+fn reflect(
+    surface_to_light_dir: &na::Vector3<f32>,
+    surface_normal: &na::Vector3<f32>,
+) -> na::Vector3<f32> {
+    2. * surface_to_light_dir.dot(surface_normal) * surface_normal - surface_to_light_dir
 }
