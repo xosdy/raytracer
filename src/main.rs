@@ -1,3 +1,4 @@
+mod light;
 mod material;
 mod sphere;
 
@@ -6,8 +7,15 @@ use std::io::{BufWriter, Write};
 
 use nalgebra as na;
 
+use crate::light::Light;
 use crate::material::Material;
 use crate::sphere::Sphere;
+
+struct RaycastHit {
+    material: Material,
+    position: na::Vector3<f32>,
+    normal: na::Vector3<f32>,
+}
 
 fn main() -> Result<(), Box<std::error::Error>> {
     let ivory = Material::new(na::Vector3::new(0.4, 0.4, 0.3));
@@ -27,12 +35,14 @@ fn main() -> Result<(), Box<std::error::Error>> {
     ));
     spheres.push(Sphere::new(na::Vector3::new(7., 5., -18.), 4., ivory));
 
-    render(&spheres)?;
+    let light = vec![Light::new(na::Vector3::new(-20., 20., 20.), 1.5)];
+
+    render(&spheres, &light)?;
 
     Ok(())
 }
 
-fn render(spheres: &[Sphere]) -> std::io::Result<()> {
+fn render(spheres: &[Sphere], lights: &[Light]) -> std::io::Result<()> {
     let width = 1024;
     let height = 768;
     let fov = std::f32::consts::PI / 2.;
@@ -44,7 +54,7 @@ fn render(spheres: &[Sphere]) -> std::io::Result<()> {
                 / height as f32;
             let y2 = -(2. * (y as f32 + 0.5) / height as f32 - 1.) * (fov / 2.).tan();
             let dir = na::Vector3::new(x2, y2, -1.).normalize();
-            framebuffer.push(cast_ray(&na::Vector3::zeros(), &dir, &spheres));
+            framebuffer.push(cast_ray(&na::Vector3::zeros(), &dir, &spheres, lights));
         }
     }
 
@@ -54,7 +64,7 @@ fn render(spheres: &[Sphere]) -> std::io::Result<()> {
     buf.write_all(
         &framebuffer
             .iter()
-            .flat_map(|v| v.iter().map(|x| (x * 255.) as u8))
+            .flat_map(|v| v.iter().map(|x| (na::clamp(x, &0., &1.) * 255.) as u8))
             .collect::<Vec<_>>(),
     )?;
 
@@ -65,9 +75,16 @@ fn cast_ray(
     origin: &na::Vector3<f32>,
     direction: &na::Vector3<f32>,
     spheres: &[Sphere],
+    lights: &[Light],
 ) -> na::Vector3<f32> {
-    if let Some(material) = scene_intersect(origin, direction, spheres) {
-        material.diffuse_color
+    if let Some(hit) = scene_intersect(origin, direction, spheres) {
+        let mut diffuse_light_intensity = 0.;
+        for light in lights {
+            let light_dir = (light.position - hit.position).normalize();
+            diffuse_light_intensity += light.intensity * (light_dir.dot(&hit.normal)).max(0.);
+        }
+
+        hit.material.diffuse_color * diffuse_light_intensity
     } else {
         na::Vector3::new(0.2, 0.7, 0.8)
     }
@@ -77,13 +94,17 @@ fn scene_intersect(
     origin: &na::Vector3<f32>,
     direction: &na::Vector3<f32>,
     spheres: &[Sphere],
-) -> Option<Material> {
+) -> Option<RaycastHit> {
     spheres
         .iter()
-        .filter_map(|s| {
-            s.ray_intersect(origin, direction)
-                .map(|dist| (dist, s.material))
-        })
+        .filter_map(|s| s.ray_intersect(origin, direction).map(|dist| (dist, s)))
         .min_by(|(x, _), (y, _)| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal))
-        .map(|(_, mat)| mat)
+        .map(|(dist, s)| {
+            let hit_point = origin + direction * dist;
+            RaycastHit {
+                material: s.material,
+                position: hit_point,
+                normal: (hit_point - s.center).normalize(),
+            }
+        })
 }
