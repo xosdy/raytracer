@@ -96,6 +96,20 @@ fn cast_ray(
         let mut specular_light_intensity = 0.;
         for light in lights {
             let light_dir = (light.position - hit.position).normalize();
+            let light_dist = (light.position - hit.position).norm();
+
+            let shadow_origin = if light_dir.dot(&hit.normal) < 0. {
+                hit.position - hit.normal * 1e-3
+            } else {
+                hit.position + hit.normal * 1e-3
+            };
+
+            if let Some(shadow_hit) = scene_intersect(&shadow_origin, &light_dir, spheres) {
+                if (shadow_hit.position - shadow_origin).norm() < light_dist {
+                    continue;
+                }
+            }
+
             diffuse_light_intensity += light.intensity * (light_dir.dot(&hit.normal)).max(0.);
             specular_light_intensity += reflect(&-light_dir, &hit.normal)
                 .dot(direction)
