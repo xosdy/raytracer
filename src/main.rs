@@ -19,21 +19,26 @@ struct RaycastHit {
 
 fn main() -> Result<(), Box<std::error::Error>> {
     let ivory = Material::new(
-        na::Vector2::new(0.6, 0.3),
+        na::Vector3::new(0.6, 0.3, 0.1),
         na::Vector3::new(0.4, 0.4, 0.3),
         50.,
     );
     let red_rubber = Material::new(
-        na::Vector2::new(0.9, 0.1),
+        na::Vector3::new(0.9, 0.1, 0.),
         na::Vector3::new(0.3, 0.1, 0.1),
         10.,
+    );
+    let mirror = Material::new(
+        na::Vector3::new(0., 10., 0.8),
+        na::Vector3::new(1., 1., 1.),
+        1425.,
     );
 
     let spheres = vec![
         Sphere::new(na::Vector3::new(-3., 0., -16.), 2., ivory),
-        Sphere::new(na::Vector3::new(-1., -1.5, -12.), 2., red_rubber),
+        Sphere::new(na::Vector3::new(-1., -1.5, -12.), 2., mirror),
         Sphere::new(na::Vector3::new(1.5, -0.5, -18.), 3., red_rubber),
-        Sphere::new(na::Vector3::new(7., 5., -18.), 4., ivory),
+        Sphere::new(na::Vector3::new(7., 5., -18.), 4., mirror),
     ];
 
     let light = vec![
@@ -59,7 +64,7 @@ fn render(spheres: &[Sphere], lights: &[Light]) -> std::io::Result<()> {
                 / height as f32;
             let y2 = -(2. * (y as f32 + 0.5) / height as f32 - 1.) * (fov / 2.).tan();
             let dir = na::Vector3::new(x2, y2, -1.).normalize();
-            framebuffer.push(cast_ray(&na::Vector3::zeros(), &dir, &spheres, lights));
+            framebuffer.push(cast_ray(&na::Vector3::zeros(), &dir, &spheres, lights, 5));
         }
     }
 
@@ -90,8 +95,23 @@ fn cast_ray(
     direction: &na::Vector3<f32>,
     spheres: &[Sphere],
     lights: &[Light],
+    depth: u32,
 ) -> na::Vector3<f32> {
+    let background_color = na::Vector3::new(0.2, 0.7, 0.8);
+
+    if depth == 0 {
+        return background_color;
+    }
+
     if let Some(hit) = scene_intersect(origin, direction, spheres) {
+        let reflect_dir = reflect(direction, &hit.normal);
+        let reflect_origin = if reflect_dir.dot(&hit.normal) < 0. {
+            hit.position - hit.normal * 1e-3
+        } else {
+            hit.position + hit.normal * 1e-3
+        };
+        let reflect_color = cast_ray(&reflect_origin, &reflect_dir, spheres, lights, depth - 1);
+
         let mut diffuse_light_intensity = 0.;
         let mut specular_light_intensity = 0.;
         for light in lights {
@@ -120,8 +140,9 @@ fn cast_ray(
 
         hit.material.diffuse_color * diffuse_light_intensity * hit.material.albedo[0]
             + na::Vector3::new(1., 1., 1.) * specular_light_intensity * hit.material.albedo[1]
+            + reflect_color * hit.material.albedo[2]
     } else {
-        na::Vector3::new(0.2, 0.7, 0.8)
+        background_color
     }
 }
 
