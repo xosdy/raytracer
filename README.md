@@ -1,5 +1,7 @@
 A toy ray tracer to learn how it works.
 
+[![Build Status](https://travis-ci.com/xosdy/raytracer.svg?branch=master)](https://travis-ci.com/xosdy/raytracer)
+
 # Run
 
 ```shell
