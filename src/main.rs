@@ -104,7 +104,7 @@ fn cast_ray(
     }
 
     if let Some(hit) = scene_intersect(origin, direction, spheres) {
-        let reflect_dir = reflect(direction, &hit.normal);
+        let reflect_dir = -reflect(direction, &hit.normal).normalize();
         let reflect_origin = if reflect_dir.dot(&hit.normal) < 0. {
             hit.position - hit.normal * 1e-3
         } else {
