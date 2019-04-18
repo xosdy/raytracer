@@ -1,6 +1,7 @@
 use nalgebra as na;
 
 use crate::material::Material;
+use crate::rendering::{Intersetable, Ray};
 
 pub struct Sphere {
     pub center: na::Vector3<f32>,
@@ -16,14 +17,12 @@ impl Sphere {
             material,
         }
     }
+}
 
-    pub fn ray_intersect(
-        &self,
-        origin: &na::Vector3<f32>,
-        direction: &na::Vector3<f32>,
-    ) -> Option<f32> {
-        let oc = self.center - origin;
-        let tca = oc.dot(direction);
+impl Intersetable for Sphere {
+    fn intersect(&self, ray: &Ray) -> Option<f32> {
+        let oc = self.center - ray.origin;
+        let tca = oc.dot(&ray.direction);
         let d2 = oc.dot(&oc) - tca.powi(2);
         if d2 > self.radius.powi(2) {
             return None;

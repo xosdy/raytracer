@@ -1,5 +1,6 @@
 mod light;
 mod material;
+mod rendering;
 mod scene;
 
 use std::fs::File;
@@ -9,23 +10,8 @@ use nalgebra as na;
 
 use crate::light::Light;
 use crate::material::Material;
+use crate::rendering::{Intersetable, Ray, RaycastHit};
 use crate::scene::Sphere;
-
-struct RaycastHit {
-    pub material: Material,
-    pub position: na::Vector3<f32>,
-    pub normal: na::Vector3<f32>,
-}
-
-impl RaycastHit {
-    pub fn get_surface(&self, dir: &na::Vector3<f32>) -> na::Vector3<f32> {
-        if dir.dot(&self.normal) < 0. {
-            self.position - self.normal * 1e-3
-        } else {
-            self.position + self.normal * 1e-3
-        }
-    }
-}
 
 fn main() -> Result<(), Box<std::error::Error>> {
     let ivory = Material::new(
@@ -83,7 +69,8 @@ fn render(spheres: &[Sphere], lights: &[Light]) -> std::io::Result<()> {
                 / height as f32;
             let y2 = -(2. * (y as f32 + 0.5) / height as f32 - 1.) * (fov / 2.).tan();
             let dir = na::Vector3::new(x2, y2, -1.).normalize();
-            framebuffer.push(cast_ray(&na::Vector3::zeros(), &dir, &spheres, lights, 5));
+            let ray = Ray::new(na::Vector3::zeros(), dir);
+            framebuffer.push(cast_ray(&ray, &spheres, lights, 5));
         }
     }
 
@@ -109,26 +96,31 @@ fn render(spheres: &[Sphere], lights: &[Light]) -> std::io::Result<()> {
     Ok(())
 }
 
-fn cast_ray(
-    origin: &na::Vector3<f32>,
-    direction: &na::Vector3<f32>,
-    spheres: &[Sphere],
-    lights: &[Light],
-    depth: u32,
-) -> na::Vector3<f32> {
+fn cast_ray(ray: &Ray, spheres: &[Sphere], lights: &[Light], depth: u32) -> na::Vector3<f32> {
     let background_color = na::Vector3::new(0.2, 0.7, 0.8);
 
     if depth == 0 {
         return background_color;
     }
 
-    if let Some(hit) = scene_intersect(origin, direction, spheres) {
-        let reflect_dir = -reflect(direction, &hit.normal).normalize();
-        let refract_dir = refract(direction, hit.normal, hit.material.refractive_index).normalize();
+    if let Some(hit) = scene_intersect(&ray, spheres) {
+        let reflect_dir = -reflect(&ray.direction, &hit.normal).normalize();
+        let refract_dir =
+            refract(&ray.direction, hit.normal, hit.material.refractive_index).normalize();
         let reflect_origin = hit.get_surface(&reflect_dir);
         let refract_origin = hit.get_surface(&refract_dir);
-        let reflect_color = cast_ray(&reflect_origin, &reflect_dir, spheres, lights, depth - 1);
-        let refract_color = cast_ray(&refract_origin, &refract_dir, spheres, lights, depth - 1);
+        let reflect_color = cast_ray(
+            &Ray::new(reflect_origin, reflect_dir),
+            spheres,
+            lights,
+            depth - 1,
+        );
+        let refract_color = cast_ray(
+            &Ray::new(refract_origin, refract_dir),
+            spheres,
+            lights,
+            depth - 1,
+        );
 
         let mut diffuse_light_intensity = 0.;
         let mut specular_light_intensity = 0.;
@@ -138,7 +130,8 @@ fn cast_ray(
 
             let shadow_origin = hit.get_surface(&light_dir);
 
-            if let Some(shadow_hit) = scene_intersect(&shadow_origin, &light_dir, spheres) {
+            if let Some(shadow_hit) = scene_intersect(&Ray::new(shadow_origin, light_dir), spheres)
+            {
                 if (shadow_hit.position - shadow_origin).norm() < light_dist {
                     continue;
                 }
@@ -146,7 +139,7 @@ fn cast_ray(
 
             diffuse_light_intensity += light.intensity * (light_dir.dot(&hit.normal)).max(0.);
             specular_light_intensity += reflect(&-light_dir, &hit.normal)
-                .dot(direction)
+                .dot(&ray.direction)
                 .max(0.)
                 .powf(hit.material.specular_exponent)
                 * light.intensity;
@@ -161,17 +154,13 @@ fn cast_ray(
     }
 }
 
-fn scene_intersect(
-    origin: &na::Vector3<f32>,
-    direction: &na::Vector3<f32>,
-    spheres: &[Sphere],
-) -> Option<RaycastHit> {
+fn scene_intersect(ray: &Ray, spheres: &[Sphere]) -> Option<RaycastHit> {
     spheres
         .iter()
-        .filter_map(|s| s.ray_intersect(origin, direction).map(|dist| (dist, s)))
+        .filter_map(|s| s.intersect(ray).map(|dist| (dist, s)))
         .min_by(|(x, _), (y, _)| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(dist, s)| {
-            let hit_point = origin + direction * dist;
+            let hit_point = ray.origin + ray.direction * dist;
             RaycastHit {
                 material: s.material,
                 position: hit_point,
