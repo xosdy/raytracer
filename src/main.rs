@@ -96,7 +96,12 @@ fn render(elements: &[impl Intersetable], lights: &[Light]) -> std::io::Result<(
     Ok(())
 }
 
-fn cast_ray(ray: &Ray, elements: &[impl Intersetable], lights: &[Light], depth: u32) -> na::Vector3<f32> {
+fn cast_ray(
+    ray: &Ray,
+    elements: &[impl Intersetable],
+    lights: &[Light],
+    depth: u32,
+) -> na::Vector3<f32> {
     let background_color = na::Vector3::new(0.2, 0.7, 0.8);
 
     if depth == 0 {
