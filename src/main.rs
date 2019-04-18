@@ -1,6 +1,6 @@
 mod light;
 mod material;
-mod sphere;
+mod scene;
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -9,7 +9,7 @@ use nalgebra as na;
 
 use crate::light::Light;
 use crate::material::Material;
-use crate::sphere::Sphere;
+use crate::scene::Sphere;
 
 struct RaycastHit {
     pub material: Material,
