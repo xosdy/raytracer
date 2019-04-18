@@ -31,4 +31,6 @@ impl RaycastHit {
 
 pub trait Intersetable {
     fn intersect(&self, ray: &Ray) -> Option<f32>;
+    fn material(&self) -> Material;
+    fn surface_normal(&self, hit_point: &na::Vector3<f32>) -> na::Vector3<f32>;
 }

@@ -41,4 +41,12 @@ impl Intersetable for Sphere {
             Some(t0)
         }
     }
+
+    fn material(&self) -> Material {
+        self.material
+    }
+
+    fn surface_normal(&self, hit_point: &na::Vector3<f32>) -> na::Vector3<f32> {
+        (hit_point - self.center).normalize()
+    }
 }
