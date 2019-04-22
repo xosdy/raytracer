@@ -3,9 +3,6 @@ mod material;
 mod rendering;
 mod scene;
 
-use std::fs::File;
-use std::io::{BufWriter, Write};
-
 use nalgebra as na;
 
 use crate::light::Light;
@@ -61,39 +58,20 @@ fn render(elements: &[impl Intersetable], lights: &[Light]) -> std::io::Result<(
     let width = 1024;
     let height = 768;
     let fov = std::f32::consts::PI / 2.;
-    let mut framebuffer = Vec::with_capacity(width * height);
+    let mut imgbuf = image::ImageBuffer::new(width, height);
 
-    for y in 0..height {
-        for x in 0..width {
-            let x2 = (2. * (x as f32 + 0.5) / width as f32 - 1.) * (fov / 2.).tan() * width as f32
-                / height as f32;
-            let y2 = -(2. * (y as f32 + 0.5) / height as f32 - 1.) * (fov / 2.).tan();
-            let dir = na::Vector3::new(x2, y2, -1.).normalize();
-            let ray = Ray::new(na::Vector3::zeros(), dir);
-            framebuffer.push(cast_ray(&ray, &elements, lights, 5));
-        }
+    for (x, y, pixel) in imgbuf.enumerate_pixels_mut() {
+        let x2 = (2. * (x as f32 + 0.5) / width as f32 - 1.) * (fov / 2.).tan() * width as f32
+            / height as f32;
+        let y2 = -(2. * (y as f32 + 0.5) / height as f32 - 1.) * (fov / 2.).tan();
+        let dir = na::Vector3::new(x2, y2, -1.).normalize();
+        let ray = Ray::new(na::Vector3::zeros(), dir);
+        let color = cast_ray(&ray, &elements, lights, 5);
+        *pixel = color_to_rgb(&color);
     }
 
-    let file = File::create("out.ppm")?;
-    let mut buf = BufWriter::with_capacity(10_000_000, file);
-    write!(buf, "P6\n{} {}\n255\n", width, height)?;
-    buf.write_all(
-        &framebuffer
-            .iter_mut()
-            .flat_map(|v| {
-                let max = *v
-                    .iter()
-                    .max_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal))
-                    .unwrap();
-                if max > 1. {
-                    *v *= 1. / max;
-                }
-                v.iter().map(|x| (na::clamp(x, &0., &1.) * 255.) as u8)
-            })
-            .collect::<Vec<_>>(),
-    )?;
-
-    Ok(())
+    std::fs::create_dir_all("./out")?;
+    imgbuf.save("./out/render.png")
 }
 
 fn cast_ray(
@@ -203,4 +181,23 @@ fn refract(
     } else {
         eta * light_to_surface_dir + (eta * cosi - k.sqrt()) * plane_normal
     }
+}
+
+fn color_to_rgb(color: &na::Vector3<f32>) -> image::Rgb<u8> {
+    let max = *color
+        .iter()
+        .max_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal))
+        .unwrap();
+
+    let c = if max > 1. {
+        color / max * 255.
+    } else {
+        color * 255.
+    };
+
+    image::Rgb([
+        na::clamp(c.x, 0., 255.) as u8,
+        na::clamp(c.y, 0., 255.) as u8,
+        na::clamp(c.z, 0., 255.) as u8,
+    ])
 }

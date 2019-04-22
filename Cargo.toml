@@ -7,3 +7,4 @@ license = "MIT"
 
 [dependencies]
 nalgebra = "0.18.0"
+image = "0.21.1"
