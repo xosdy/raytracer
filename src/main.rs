@@ -3,6 +3,7 @@ mod material;
 mod rendering;
 mod scene;
 
+use image::ImageResult;
 use nalgebra as na;
 
 use crate::light::Light;
@@ -10,7 +11,7 @@ use crate::material::Material;
 use crate::rendering::{Intersetable, Ray, RaycastHit};
 use crate::scene::Sphere;
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ivory = Material::new(
         na::Vector4::new(0.6, 0.3, 0.1, 0.),
         na::Vector3::new(0.4, 0.4, 0.3),
@@ -54,7 +55,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
     Ok(())
 }
 
-fn render(elements: &[impl Intersetable], lights: &[Light]) -> std::io::Result<()> {
+fn render(elements: &[impl Intersetable], lights: &[Light]) -> ImageResult<()> {
     let width = 1024;
     let height = 768;
     let fov = std::f32::consts::PI / 2.;

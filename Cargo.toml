@@ -6,5 +6,5 @@ edition = "2018"
 license = "MIT"
 
 [dependencies]
-nalgebra = "0.18.0"
-image = "0.23.5"
+nalgebra = "0.31.0"
+image = "0.24.2"
