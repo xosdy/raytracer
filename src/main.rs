@@ -67,7 +67,7 @@ fn render(elements: &[impl Intersetable], lights: &[Light]) -> ImageResult<()> {
         let y2 = -(2. * (y as f32 + 0.5) / height as f32 - 1.) * (fov / 2.).tan();
         let dir = na::Vector3::new(x2, y2, -1.).normalize();
         let ray = Ray::new(na::Vector3::zeros(), dir);
-        let color = cast_ray(&ray, &elements, lights, 5);
+        let color = cast_ray(&ray, elements, lights, 5);
         *pixel = color_to_rgb(&color);
     }
 
@@ -87,7 +87,7 @@ fn cast_ray(
         return background_color;
     }
 
-    if let Some(hit) = scene_intersect(&ray, elements) {
+    if let Some(hit) = scene_intersect(ray, elements) {
         let reflect_dir = -reflect(&ray.direction, &hit.normal).normalize();
         let refract_dir =
             refract(&ray.direction, hit.normal, hit.material.refractive_index).normalize();
